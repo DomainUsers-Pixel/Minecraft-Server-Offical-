@@ -1,0 +1,48 @@
+name: Minecraft Server 1.21.4 (Playit Tunnel Setup)
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: Start PaperMC 1.21.4
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Update & Install dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y openjdk-21-jdk wget unzip screen
+
+      - name: Download PaperMC 1.21.4 (if not uploaded)
+        run: |
+          if [ ! -f server.jar ]; then
+            wget -O server.jar https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/latest/downloads/paper-1.21.4-latest.jar
+          fi
+
+      - name: Setup EULA and Properties
+        run: |
+          echo "eula=true" > eula.txt
+          echo "enable-command-block=true" >> server.properties
+          echo "online-mode=false" >> server.properties
+          echo "motd=§dGitHub Action Server by DR1TRA" >> server.properties
+          echo "view-distance=10" >> server.properties
+          echo "max-players=5" >> server.properties
+          echo "server-port=25565" >> server.properties
+
+      - name: Install Playit.gg tunnel
+        run: |
+          wget https://playit.gg/downloads/playit-linux -O playit
+          chmod +x playit
+          ./playit &
+
+      - name: Start Your Minecraft Server (6–8 GB RAM, 4 Cores)
+        run: |
+          echo "Starting PaperMC server..."
+          screen -dmS mc java -Xms6G -Xmx8G -jar server.jar nogui
+          sleep 30
+          echo "Server should now be running. Checking playit tunnel..."
+          curl -s localhost:10000 || echo "Playit tunnel active. Check logs below for public address."
+          echo "Keeping server alive for 6 hours..."
+          sleep 21600  # 6 hours (in seconds)
