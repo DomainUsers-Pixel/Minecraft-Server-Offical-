@@ -18,8 +18,8 @@ jobs:
       - name: Download PaperMC 1.21.4 (if not uploaded)
         run: |
           if [ ! -f server.jar ]; then
-            wget -O server.jar https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/latest/downloads/paper-1.21.4-latest.jar
-          fi
+          curl https://api.papermc.io/v2/projects/paper/versions/1.21.4
+          wget https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/47/downloads/paper-1.21.4-47.jar -O paper.jar
 
       - name: Setup EULA and Properties
         run: |
