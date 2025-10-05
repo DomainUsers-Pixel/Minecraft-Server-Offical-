@@ -36,15 +36,21 @@ jobs:
             exit 1
           fi
 
+      - name:  ✨️Server.log & Playit.log 
+      cd server 
+      touch server.log 
+      touch playit.log
+      echo "✅️Done with logs"
       - name: ⚙️ Setup EULA + Server Properties
         run: |
           cd server
+          touch eula.txt 
           echo "eula=true" > eula.txt
           cat > server.properties <<EOF
           online-mode=false
-          motd=Zodex Server 1.21.4
+          motd= Server 1.21.4
           view-distance=10
-          max-players=50
+          max-players=5
           server-port=25565
           EOF
 
