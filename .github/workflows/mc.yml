@@ -1,48 +1,74 @@
-name: Minecraft Server 1.21.4 (Playit Tunnel Setup)
+name: Minecraft Server 1.21.4 (Paper + Playit.gg)
+
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Run manually from Actions tab
+  push:
+    branches:
+      - main
 
 jobs:
-  run:
+  server:
     runs-on: ubuntu-latest
-    name: Start PaperMC 1.21.4
+    timeout-minutes: 360  # 6 hours max per session
+
     steps:
-      - name: Checkout repo
+      - name: 🧰 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Update & Install dependencies
+      - name: ☕ Install JDK 21
         run: |
           sudo apt update -y
-          sudo apt install -y openjdk-21-jdk wget unzip screen
+          sudo apt install -y openjdk-21-jdk wget screen
 
-      - name: Download PaperMC 1.21.4 (if not uploaded)
+      - name: 📦 Download PaperMC 1.21.4 (Build 47)
         run: |
-          if [ ! -f server.jar ]; then
-          curl https://api.papermc.io/v2/projects/paper/versions/1.21.4
-          wget https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/47/downloads/paper-1.21.4-47.jar -O paper.jar
+          mkdir -p server
+          cd server
+          wget -q --show-progress https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/47/downloads/paper-1.21.4-47.jar -O paper.jar
 
-      - name: Setup EULA and Properties
+      - name: ⚙️ Setup EULA + Server Properties
         run: |
+          cd server
           echo "eula=true" > eula.txt
-          echo "enable-command-block=true" >> server.properties
-          echo "online-mode=false" >> server.properties
-          echo "motd=§dGitHub Action Server by DR1TRA" >> server.properties
-          echo "view-distance=10" >> server.properties
-          echo "max-players=5" >> server.properties
-          echo "server-port=25565" >> server.properties
+          cat > server.properties <<EOF
+          online-mode=false
+          motd=Zodex Server 1.21.4
+          view-distance=10
+          max-players=50
+          server-port=25565
+          EOF
 
-      - name: Install Playit.gg tunnel
+      - name: 🌍 Download Playit.gg Tunnel
         run: |
-          wget https://playit.gg/downloads/playit-linux -O playit
+          cd server
+          wget -q --show-progress https://playit.gg/downloads/playit-linux-amd64 -O playit
           chmod +x playit
-          ./playit &
 
-      - name: Start Your Minecraft Server (6–8 GB RAM, 4 Cores)
+      - name: 🚀 Launch Minecraft Server + Playit (With Logs)
         run: |
-          echo "Starting PaperMC server..."
-          screen -dmS mc java -Xms6G -Xmx8G -jar server.jar nogui
-          sleep 30
-          echo "Server should now be running. Checking playit tunnel..."
-          curl -s localhost:10000 || echo "Playit tunnel active. Check logs below for public address."
-          echo "Keeping server alive for 6 hours..."
-          sleep 21600  # 6 hours (in seconds)
+          cd server
+          echo "Starting PaperMC 1.21.4 server with 8GB RAM..."
+          screen -dmS mcserver bash -c "java -Xms6G -Xmx8G -jar paper.jar nogui > server.log 2>&1"
+          sleep 10
+          echo "Starting Playit tunnel..."
+          screen -dmS playit bash -c "./playit > playit.log 2>&1"
+          echo "Server and Playit tunnel launched successfully!"
+          echo "You can view server logs below (live tail):"
+          tail -n 50 server.log || true
+
+      - name: 🧠 Debug + Crash Reporter
+        if: ${{ failure() }}
+        run: |
+          echo "❌ Server crashed or cancelled! Collecting logs..."
+          cd server || exit 1
+          echo "--- Server Log ---"
+          tail -n 40 server.log || echo "No server log found."
+          echo "--- Playit Log ---"
+          tail -n 40 playit.log || echo "No playit log found."
+          echo "⚠️ Please check above logs for cause (e.g., Java crash, EULA issue, Playit error)."
+
+      - name: ⏳ Keep Server Running
+        run: |
+          echo "Server is running... keeping alive for 6 hours."
+          sleep 21600
+          echo "✅ Server session ended normally."
