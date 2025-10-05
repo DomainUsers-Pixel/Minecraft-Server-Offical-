@@ -1,30 +1,40 @@
 name: Minecraft Server 1.21.4 (Paper + Playit.gg)
 
 on:
-  workflow_dispatch: # Run manually from Actions tab
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   server:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 hours max per session
+    timeout-minutes: 360  # 6 hours max
 
     steps:
-      - name: 🧰 Checkout repository
+      - name: 🧰 Checkout repo
         uses: actions/checkout@v4
 
-      - name: ☕ Install JDK 21
+      - name: ☕ Install JDK 21 + utilities
         run: |
           sudo apt update -y
-          sudo apt install -y openjdk-21-jdk wget screen
+          sudo apt install -y openjdk-21-jdk wget unzip screen
 
-      - name: 📦 Download PaperMC 1.21.4 (Build 47)
+      - name: 📂 Setup Server Folder
         run: |
           mkdir -p server
           cd server
-          wget -q --show-progress https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/47/downloads/paper-1.21.4-47.jar -O paper.jar
+          echo "✅ Server folder created"
+
+      - name: 📦 Download PaperMC 1.21.4 (Build 47) with Retry
+        run: |
+          cd server
+          for i in {1..3}; do
+            wget -q --show-progress https://api.papermc.io/v2/projects/paper/versions/1.21.4/builds/47/downloads/paper-1.21.4-47.jar -O paper.jar && break
+            echo "Download failed, retry $i..."
+            sleep 5
+          done
+          if [ ! -f paper.jar ]; then
+            echo "❌ ERROR: PaperMC jar not found after retries"
+            exit 1
+          fi
 
       - name: ⚙️ Setup EULA + Server Properties
         run: |
@@ -43,32 +53,40 @@ jobs:
           cd server
           wget -q --show-progress https://playit.gg/downloads/playit-linux-amd64 -O playit
           chmod +x playit
+          echo "✅ Playit.gg client ready"
 
-      - name: 🚀 Launch Minecraft Server + Playit (With Logs)
+      - name: 🚀 Launch Minecraft Server + Playit
         run: |
           cd server
-          echo "Starting PaperMC 1.21.4 server with 8GB RAM..."
+          echo "Starting Minecraft server..."
+          # Start server in screen with immediate logging
           screen -dmS mcserver bash -c "java -Xms6G -Xmx8G -jar paper.jar nogui > server.log 2>&1"
-          sleep 10
-          echo "Starting Playit tunnel..."
+          sleep 15
+          if [ ! -f server.log ]; then
+            echo "❌ ERROR: server.log not created. Server may have crashed immediately."
+            exit 1
+          fi
+          echo "✅ PaperMC started. Launching Playit tunnel..."
           screen -dmS playit bash -c "./playit > playit.log 2>&1"
-          echo "Server and Playit tunnel launched successfully!"
-          echo "You can view server logs below (live tail):"
-          tail -n 50 server.log || true
+          sleep 10
+          if [ ! -f playit.log ]; then
+            echo "⚠️ Playit tunnel may not have started correctly."
+          fi
+          tail -n 20 server.log
+          tail -n 20 playit.log
 
-      - name: 🧠 Debug + Crash Reporter
+      - name: 🧠 Crash / Debug Reporter
         if: ${{ failure() }}
         run: |
-          echo "❌ Server crashed or cancelled! Collecting logs..."
+          echo "❌ Workflow failed. Collecting logs..."
           cd server || exit 1
           echo "--- Server Log ---"
-          tail -n 40 server.log || echo "No server log found."
+          tail -n 50 server.log || echo "No server log found."
           echo "--- Playit Log ---"
-          tail -n 40 playit.log || echo "No playit log found."
-          echo "⚠️ Please check above logs for cause (e.g., Java crash, EULA issue, Playit error)."
+          tail -n 50 playit.log || echo "No playit log found."
 
-      - name: ⏳ Keep Server Running
+      - name: ⏳ Keep Server Alive
         run: |
-          echo "Server is running... keeping alive for 6 hours."
+          echo "Server running. Keeping workflow alive for 6 hours..."
           sleep 21600
           echo "✅ Server session ended normally."
