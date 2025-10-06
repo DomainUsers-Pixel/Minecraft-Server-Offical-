@@ -27,31 +27,14 @@ jobs:
             dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
-      - name: Create RDP User with fixed password (from secret)
-        shell: powershell
-        env:
-          RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+      - name: Create RDP User with fixed password
         run: |
-          $username = "DR1"
-          if (-not $env:RDP_PASSWORD) {
-            Write-Error "RDP_PASSWORD secret is not set. Set it in repo secrets."
-            exit 1
-          }
-
-          # Remove existing user if present (optional cleanup)
-          if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
-              Write-Host "User $username already exists - removing to recreate"
-              Remove-LocalUser -Name $username -ErrorAction SilentlyContinue
-          }
-
-          $securePass = ConvertTo-SecureString $env:RDP_PASSWORD -AsPlainText -Force
-          New-LocalUser -Name $username -Password $securePass -AccountNeverExpires -PasswordNeverExpires
+          $username = "${{ secrets.RDP_USERNAME }}"
+          $password = ConvertTo-SecureString "${{ secrets.RDP_PASSWORD }}" -AsPlainText -Force
+          New-LocalUser -Name $username -Password $password -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member $username
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member $username
-
-          # Do NOT print the password (security). Print only username so you know what to use.
-          echo "RDP_USER=$username" >> $env:GITHUB_ENV
-          Write-Host "User $username created successfully."
+          Write-Host "RDP user $username created successfully."
 
       - name: Install Tailscale
         run: |
